@@ -1,0 +1,201 @@
+// This is your Prisma schema file,
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated/prisma"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Auth models
+model User {
+  id              String         @id @default(uuid())
+  email           String         @unique
+  name            String?
+  role            String?        @default("Member") // Admin, Manager, Member
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  identities      UserIdentity[]
+  isDeleted       Boolean        @default(false)
+  createdProjects Project[]
+  assignedTasks   Task[]
+  comments        Comment[]
+  timeEntries     TimeEntry[]
+  activityLogs    ActivityLog[]
+
+  @@index([email])
+}
+
+model UserIdentity {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider   String // 'Google', 'GitHub', 'EmailPassword', 'PhoneOTP', etc.
+  providerId String // Provider's unique user ID (or email for email/password)
+  metadata   Json? // Provider-specific data (passwordHash, tokens, profile data, etc.)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isDeleted  Boolean  @default(false)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+}
+
+
+model Otp {
+  id         String   @id @default(uuid())
+  identifier String   // Phone number or email address
+  type       String   // 'phone' or 'email'
+  otp        String   // Hashed OTP
+  expiresAt  DateTime
+  attempts   Int      @default(0)
+  verified   Boolean  @default(false)
+  purpose    String?  // 'login', 'registration', 'password_reset', '2fa', etc.
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isDeleted  Boolean  @default(false)
+
+  @@index([identifier, type])
+  @@index([expiresAt])
+  @@index([identifier, type, verified])
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  deadline    DateTime?
+  status      String   @default("Active")
+  createdBy   String
+  creator     User     @relation(fields: [createdBy], references: [id])
+  teamMembers String[] // Storing user IDs as an array for simplicity in prototype
+  tasks       Task[]
+  meetings    Meeting[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+
+  @@index([createdBy])
+}
+
+model Meeting {
+  id          String   @id @default(uuid())
+  title       String
+  date        DateTime
+  transcript  String?
+  summary     String?
+  tasks       Json?    // For storing the extracted tasks as a JSON array
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+
+  @@index([projectId])
+}
+
+model Task {
+  id             String           @id @default(uuid())
+  title          String
+  description    String?
+  projectId      String
+  project        Project          @relation(fields: [projectId], references: [id])
+  assignedTo     String?
+  assignee       User?            @relation(fields: [assignedTo], references: [id])
+  status         String           @default("To Do") // To Do, In Progress, Done
+  priority       String           @default("Medium") // Low, Medium, High
+  dueDate        DateTime?
+  position       Float?           @default(0) // For Kanban ordering
+  estimatedTime  Int?             @default(0) // In minutes
+  actualTime     Int?             @default(0) // In minutes, aggregated
+  comments       Comment[]
+  timeEntries    TimeEntry[]
+  dependencies   TaskDependency[] @relation("DependentTask")
+  dependents     TaskDependency[] @relation("DependsOnTask")
+  fileVersions   FileVersion[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  isDeleted      Boolean          @default(false)
+
+  @@index([projectId])
+  @@index([assignedTo])
+}
+
+model TaskDependency {
+  id              String   @id @default(uuid())
+  taskId          String
+  dependentTask   Task     @relation("DependentTask", fields: [taskId], references: [id])
+  dependsOnTaskId String
+  dependsOnTask   Task     @relation("DependsOnTask", fields: [dependsOnTaskId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isDeleted       Boolean  @default(false)
+
+  @@index([taskId])
+  @@index([dependsOnTaskId])
+}
+
+model TimeEntry {
+  id          String    @id @default(uuid())
+  taskId      String
+  task        Task      @relation(fields: [taskId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int?      @default(0) // In seconds
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isDeleted   Boolean   @default(false)
+
+  @@index([taskId])
+  @@index([userId])
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+  isDeleted Boolean  @default(false)
+
+  @@index([userId])
+}
+
+model FileVersion {
+  id            String   @id @default(uuid())
+  taskId        String
+  task          Task     @relation(fields: [taskId], references: [id])
+  fileName      String
+  fileUrl       String
+  versionNumber Int
+  uploadedBy    String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  isDeleted     Boolean  @default(false)
+
+  @@index([taskId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  @@index([taskId])
+  @@index([userId])
+}
+
+
