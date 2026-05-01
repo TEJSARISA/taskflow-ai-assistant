@@ -5,3 +5,5 @@
 **/.env
 **/.env.local
 **/.env.*.local
+
+frontend/netlify-package*/
