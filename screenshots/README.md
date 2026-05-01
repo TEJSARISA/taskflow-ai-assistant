@@ -1,15 +1,7 @@
 # Screenshots & GIFs
 
-These are placeholder demo assets so README media links render correctly.
-Replace each file with real product captures:
+These media assets are captured from the live product:
 
-- full-demo.gif
-- auth-demo.gif
-- ai-demo.gif
-- task-demo.gif
-- notifications-demo.gif
-- login.png
-- dashboard.png
-- task-create.png
-- ai-suggestions.png
-- task-list.png
+- https://taskflowaiforprojectmanagement.netlify.app/
+
+Files power the main project README preview sections.
